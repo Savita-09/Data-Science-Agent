@@ -323,8 +323,7 @@ PROBLEM_TYPES = {
 GROQ_MODELS = {
     "llama-3.3-70b-versatile": "LLaMA 3.3 70B (Recommended)",
     "llama-3.1-8b-instant": "LLaMA 3.1 8B (Fast)",
-    "mixtral-8x7b-32768": "Mixtral 8x7B",
-    "gemma2-9b-it": "Gemma 2 9B",
+    "openai/gpt-oss-120b", "GPT Oss Model"
 }
 
 WORKFLOW_STEPS = [
