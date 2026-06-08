@@ -974,7 +974,7 @@ with st.sidebar:
     if groq_key:
         valid, reason = check_groq_key(groq_key)
         if valid:
-            st.success("✅ Key format looks good", icon="🔐")
+            st.success("✅ groq api uploaded", icon="🔐")
         else:
             st.warning(f"⚠️ {reason}", icon="🔑")
 
