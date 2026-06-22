@@ -279,7 +279,6 @@ hr { border-color: var(--border) !important; }
 """, unsafe_allow_html=True)
 
 
-
 PROBLEM_TYPES = {
     "classification": {
         "description": "Predicting categorical outcomes (churn, fraud, diagnosis)",
@@ -424,7 +423,7 @@ def check_groq_key(api_key: str) -> tuple[bool, str]:
         return False, "API key appears too short"
     return True, "OK"
 
-
+# api = "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"
 
 def run_crewai_workflow(
     problem_type: str,
