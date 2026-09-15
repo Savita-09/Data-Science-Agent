@@ -15,6 +15,8 @@ cd Data-Science-Agent
 
 GitHub hosts the source code. Running the full app requires a Python server and training worker; GitHub Pages cannot run this backend. Use the local launcher or Docker Compose instructions below.
 
+For a Vercel dashboard with a separate Python service, follow [Vercel deployment](docs/VERCEL.md). Import the repository with `frontend` as the root directory.
+
 ## Quick start — Windows PowerShell
 
 Prerequisites: Python 3.12 and Node.js 22.12+ with npm. Allow roughly 2 GB for Python dependencies and at least 4 GB available RAM. Commands start in this directory.

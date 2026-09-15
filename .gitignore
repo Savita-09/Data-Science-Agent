@@ -1,4 +1,6 @@
 .venv/
+.vercel/
+.hosted/
 .env
 .env.*
 !.env.example

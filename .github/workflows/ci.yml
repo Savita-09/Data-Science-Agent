@@ -51,4 +51,4 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Frontend regression tests
-        run: node --experimental-strip-types --test tests/setup.test.ts
+        run: node --experimental-strip-types --test tests/*.test.ts
