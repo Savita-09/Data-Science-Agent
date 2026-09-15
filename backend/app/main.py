@@ -51,11 +51,17 @@ def create_app(settings=None):
     app.add_middleware(BodyLimitMiddleware,limit=settings.max_upload_mb*1024**2+65536)
     key_header=APIKeyHeader(name='X-API-Key',auto_error=False)
 
-    def authorized(request:Request,key:str|None=Depends(key_header)):
+    def require_key(request:Request,key:str|None=Depends(key_header)):
         if settings.api_key:
             if not key or not hmac.compare_digest(key,settings.api_key):raise HTTPException(401,'A valid X-API-Key header is required.')
         elif request.client and request.client.host not in ('127.0.0.1','::1','localhost','testclient'):
             raise HTTPException(403,'Unauthenticated development access is restricted to the local computer.')
+
+    def public_access():
+        return None
+
+    # Public routes also omit API-key requirements from the generated OpenAPI schema.
+    authorized = public_access if settings.public_demo else require_key
 
     def analysis_or_404(analysis_id):
         row=store.analysis(str(analysis_id))
@@ -71,7 +77,7 @@ def create_app(settings=None):
         return response
 
     @app.get('/api/health')
-    def health():return {'status':'ok','version':'1.0.0','llm_configured':settings.llm_configured,'groq_configured':settings.groq_configured,'groq_model':settings.groq_model,'auth_required':bool(settings.api_key),'ephemeral_storage':settings.ephemeral_storage,'max_rows':settings.max_rows,'max_upload_mb':settings.max_upload_mb,'max_job_seconds':settings.max_job_seconds}
+    def health():return {'status':'ok','version':'1.0.0','llm_configured':settings.llm_configured,'groq_configured':settings.groq_configured,'groq_model':settings.groq_model,'auth_required':bool(settings.api_key) and not settings.public_demo,'public_demo':settings.public_demo,'ephemeral_storage':settings.ephemeral_storage,'max_rows':settings.max_rows,'max_upload_mb':settings.max_upload_mb,'max_job_seconds':settings.max_job_seconds}
 
     def persist_dataset(frame,filename):
         dataset_id=str(uuid4());content=frame.to_csv(index=False).encode('utf-8');sha=hashlib.sha256(content).hexdigest()

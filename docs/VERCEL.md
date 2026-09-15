@@ -6,6 +6,8 @@ Deploy the React dashboard from this repository with **Root Directory: `frontend
 
 The app requires a running FastAPI service and training worker sharing a writable data directory and model directory. The existing SQLite queue and worker are not a standalone Vercel Function deployment. A dashboard deployment by itself cannot perform analyses. See [Vercel function limits](https://vercel.com/docs/functions/limitations).
 
+For a private deployment (the public Render demo is described below):
+
 1. Run the API and worker on a host with enough memory and persistent storage, using the Docker Compose or local launcher instructions in the main README.
 2. Expose the API over HTTPS with `APP_ENV=production` and a random `APP_API_KEY` of at least 32 characters.
 3. Set backend `CORS_ORIGINS` to the exact dashboard origin, such as `https://your-project.vercel.app`. Include additional preview origins explicitly only when needed.
@@ -38,7 +40,7 @@ For an always-on deployment, use a persistent Python host and a stable HTTPS add
 
 ## Free Render cloud demo
 
-`render.yaml` defines a **Free** Docker web service using `Dockerfile.backend`. The container launches the API and worker together on port 10000, and generates a private application key during Blueprint creation. Import the repository as a Render Blueprint after reviewing the Free plan. The API health endpoint is `/api/health`.
+`render.yaml` defines a **Free** Docker web service using `Dockerfile.backend`. The container launches the API and worker together on port 10000. `config.render.yaml` explicitly enables `public_demo: true`, so visitors need no application API key. The previously generated Render key is ignored in public mode and is never published to the browser. Import the repository as a Render Blueprint after reviewing the Free plan. The API health endpoint is `/api/health`.
 
 `config.render.yaml` limits the demo to 5 MB uploads, 5,000 rows, 40 columns, 20 selected features, two queued/running jobs, and a 384 MB training-process budget within the host's memory limit. Start with the synthetic churn sample and Quick mode. Large ML/DL tasks may fail with a resource-limit error. This is a demo configuration, not a production capacity guarantee.
 
@@ -46,7 +48,9 @@ Render's free filesystem is temporary. Uploads, SQLite records, models, and repo
 
 Keep the service on the Free plan and review account usage limits. No paid disk, database, or worker service is configured by this Blueprint. Set a zero spending limit where available; Render may charge usage overages when a payment method is present. This setup does not add a payment method.
 
-After Render reports the backend healthy, set `VITE_API_BASE_URL` in Vercel to its HTTPS service URL and redeploy. `CORS_ORIGINS` in the Blueprint is the current dashboard origin. Enter the generated `APP_API_KEY` in the dashboard's API connection dialog. Add `GROQ_API_KEY` privately in Render's environment settings if you want Groq chat; the Blueprint does not contain a provider credential.
+After Render reports the backend healthy, set `VITE_API_BASE_URL` in Vercel to its HTTPS service URL and redeploy. `CORS_ORIGINS` in the Blueprint is the current dashboard origin. The public dashboard connects automatically and does not display an API-key prompt. Add `GROQ_API_KEY` privately in Render's environment settings if you want Groq chat; the Blueprint does not contain a provider credential.
+
+The public demo is a shared workspace: every visitor can see datasets, analyses, chats, and reports, and can submit/cancel demo jobs. Use only sample or non-sensitive data. Public mode requires `ephemeral_storage: true` and automatically uses `public-demo` subdirectories beneath `DATA_ROOT` and `PROJECT_ROOT`, keeping previous private files outside the demo. It retains upload, training, memory, and queue limits. Set `PUBLIC_DEMO=false` and configure `APP_API_KEY` to restore private access; this uses the original private directories again. API and worker must use the same settings.
 
 ### Connection recovery
 

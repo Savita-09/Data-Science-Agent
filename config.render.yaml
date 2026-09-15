@@ -12,3 +12,4 @@ tuning_iterations: 3
 shap_rows: 3
 seed: 42
 ephemeral_storage: true
+public_demo: true

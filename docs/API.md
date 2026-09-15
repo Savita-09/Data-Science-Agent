@@ -2,7 +2,7 @@
 
 Base URL: `http://127.0.0.1:8000`. Interactive schema: `/docs`. Machine-readable schema: `/openapi.json` (also exported beside this document).
 
-All `/api` endpoints except `/api/health` require `X-API-Key` when configured. In production the server refuses to start without a key of at least 32 characters. Without a key, development API access is restricted to loopback. Keep keys in headers, never URL parameters. API errors have a `detail` field; schema-validation errors contain a list of field errors.
+Private deployments require `X-API-Key` on all `/api` endpoints except `/api/health`; private production refuses to start without a key of at least 32 characters. The explicitly enabled **public demo** requires no API key, uses isolated `public-demo` data/model subdirectories, and shares all demo datasets and analyses with every visitor. Health reports `public_demo: true` and `auth_required: false` in this mode. Development without either mode is restricted to loopback. Keep private keys in headers, never URL parameters. API errors have a `detail` field; schema-validation errors contain a list of field errors.
 
 | Method | Path | Result |
 | --- | --- | --- |

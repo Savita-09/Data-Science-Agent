@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / '.env')
@@ -10,6 +10,7 @@ load_dotenv(ROOT / '.env')
 class Settings(BaseModel):
     app_env: str = 'development'
     api_key: str = ''
+    public_demo: bool = False
     ephemeral_storage: bool = False
     data_root: Path = ROOT / 'data'
     project_root: Path = ROOT / 'projects'
@@ -34,6 +35,18 @@ class Settings(BaseModel):
     groq_model: str = 'openai/gpt-oss-20b'
     groq_timeout_seconds: int = Field(30, ge=1, le=120)
 
+    @model_validator(mode='after')
+    def isolate_public_demo(self):
+        # API and worker resolve the same isolated workspace, including subprocess copies.
+        if self.public_demo:
+            if not self.ephemeral_storage:
+                raise ValueError('Public demo mode requires ephemeral_storage=true.')
+            for name in ('data_root', 'project_root'):
+                path = getattr(self, name)
+                if path.name != 'public-demo':
+                    setattr(self, name, path / 'public-demo')
+        return self
+
     @property
     def groq_configured(self): return bool(self.groq_api_key.strip() and self.groq_model.strip())
 
@@ -44,7 +57,7 @@ class Settings(BaseModel):
     def llm_configured(self): return bool(self.llm_base_url and self.llm_api_key and self.llm_model)
 
     def initialize(self):
-        if self.app_env == 'production' and len(self.api_key) < 32:
+        if self.app_env == 'production' and not self.public_demo and len(self.api_key) < 32:
             raise ValueError('Production requires APP_API_KEY with at least 32 characters.')
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.project_root.mkdir(parents=True, exist_ok=True)
@@ -54,6 +67,7 @@ def get_settings():
     values = yaml.safe_load(path.read_text()) if path.exists() else {}
     for name, env in {'app_env':'APP_ENV', 'api_key':'APP_API_KEY', 'data_root':'DATA_ROOT', 'project_root':'PROJECT_ROOT', 'max_job_seconds':'MAX_JOB_SECONDS', 'max_memory_mb':'MAX_MEMORY_MB', 'llm_base_url':'LLM_BASE_URL', 'llm_api_key':'LLM_API_KEY', 'llm_model':'LLM_MODEL', 'llm_timeout_seconds':'LLM_TIMEOUT_SECONDS', 'groq_api_key':'GROQ_API_KEY', 'groq_model':'GROQ_MODEL', 'groq_timeout_seconds':'GROQ_TIMEOUT_SECONDS'}.items():
         if os.getenv(env): values[name] = os.environ[env]
+    if os.getenv('PUBLIC_DEMO') is not None: values['public_demo'] = os.environ['PUBLIC_DEMO']
     if os.getenv('CORS_ORIGINS'): values['cors_origins'] = os.environ['CORS_ORIGINS'].split(',')
     for name in ('data_root', 'project_root'):
         if name in values:

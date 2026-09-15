@@ -65,14 +65,13 @@ jobs:
           python-version: "3.12"
       - name: Build backend container
         run: docker build -f Dockerfile.backend -t autods-backend:test .
-      - name: Run synthetic workflow within 512 MB
+      - name: Run public workflow without an API key within 512 MB
         shell: bash
         run: |
-          export APP_API_KEY="ci-disposable-application-test-key-with-no-real-access"
           python -m pip install httpx
           docker run -d --name autods-test --memory=512m --memory-swap=512m \
             -p 127.0.0.1:8001:10000 \
-            -e APP_ENV=production -e APP_API_KEY \
+            -e APP_ENV=production \
             -e APP_CONFIG=/srv/autods/config.render.yaml \
             -e CORS_ORIGINS=https://data-science-agent-rosy.vercel.app \
             autods-backend:test

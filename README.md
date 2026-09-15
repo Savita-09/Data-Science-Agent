@@ -117,6 +117,8 @@ The supported workload is **independent-row tabular data**. Neural networks here
 
 ## Configuration and operations
 
+The deployed Render demo uses **public access without an API key**. `config.render.yaml` enables `public_demo: true` with temporary storage. Visitors share the demo's uploads, analyses, chats, and reports; use sample or non-sensitive data only. Public mode automatically uses separate `public-demo` subdirectories, leaving private workspaces untouched. Local and private production defaults retain API-key protection. See [deployment and access modes](docs/VERCEL.md).
+
 Defaults in `config.yaml`: 20 MB per upload, 50,000 rows, 100 columns, 40 selected features, 512 encoded features, 20 queued/running analyses, 900 seconds per job, 2,048 MB process-tree RSS, three CV folds, three tuning configurations per candidate, and ten local SHAP examples. The worker executes one job at a time and estimators use one thread. Dataset-size limits fail with an actionable error instead of silently sampling the training data.
 
 `MAX_JOB_SECONDS`, `MAX_MEMORY_MB`, `DATA_ROOT`, `PROJECT_ROOT`, `APP_CONFIG`, authentication, CORS, and LLM settings can be supplied through environment variables. Request limits cannot exceed server limits. Request `seed` and `cv_folds` default to 42 and 3 in the API schema. Increase worker/container resources together if you raise limits. Resource checks occur about every half second; they do not provide an OS sandbox or exact real-time enforcement. Docker adds an outer resource boundary.

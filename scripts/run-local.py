@@ -25,8 +25,8 @@ def main():
         sys.path.insert(0,str(ROOT/'backend'))
         from app.settings import get_settings
         settings=get_settings()
-        if settings.app_env!='production' or len(settings.api_key)<32:
-            parser.error('A public bind requires APP_ENV=production and APP_API_KEY with at least 32 characters.')
+        if settings.app_env!='production' or (not settings.public_demo and len(settings.api_key)<32):
+            parser.error('A public bind requires APP_ENV=production and either APP_API_KEY with at least 32 characters or explicit public demo mode.')
     def shutdown(signum,frame):raise KeyboardInterrupt
     signal.signal(signal.SIGTERM,shutdown)
     processes=[]
