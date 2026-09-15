@@ -1,0 +1,46 @@
+x-runtime: &runtime
+  build: .
+  image: autonomous-ai-data-scientist:local
+  environment: &environment
+    APP_ENV: production
+    APP_API_KEY: ${APP_API_KEY:?Set APP_API_KEY to a random secret of at least 32 characters in .env}
+    DATA_ROOT: /srv/autods/data
+    PROJECT_ROOT: /srv/autods/projects
+    LLM_BASE_URL: ${LLM_BASE_URL:-}
+    LLM_API_KEY: ${LLM_API_KEY:-}
+    LLM_MODEL: ${LLM_MODEL:-}
+    GROQ_API_KEY: ${GROQ_API_KEY:-}
+    GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+    GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-30}
+    MAX_JOB_SECONDS: ${MAX_JOB_SECONDS:-900}
+    MAX_MEMORY_MB: ${MAX_MEMORY_MB:-2048}
+    CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+  volumes:
+    - analysis-data:/srv/autods/data
+    - analysis-projects:/srv/autods/projects
+  read_only: true
+  tmpfs:
+    - /tmp:size=256m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  init: true
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *runtime
+    ports: ["127.0.0.1:8000:8000"]
+    mem_limit: 1g
+    cpus: 1
+  worker:
+    <<: *runtime
+    command: ["python", "-m", "app.worker"]
+    healthcheck:
+      disable: true
+    mem_limit: 3g
+    cpus: 2
+    stop_grace_period: 10s
+
+volumes:
+  analysis-data:
+  analysis-projects:

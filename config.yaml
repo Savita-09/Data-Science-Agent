@@ -1,0 +1,12 @@
+max_upload_mb: 20
+max_rows: 50000
+max_columns: 100
+max_features: 40
+max_encoded_features: 512
+max_job_seconds: 900
+max_memory_mb: 2048
+max_queued_jobs: 20
+cv_folds: 3
+tuning_iterations: 3
+shap_rows: 10
+seed: 42
