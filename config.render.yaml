@@ -1,0 +1,14 @@
+# Conservative settings for a small, disposable cloud demo.
+max_upload_mb: 5
+max_rows: 5000
+max_columns: 40
+max_features: 20
+max_encoded_features: 128
+max_job_seconds: 600
+max_memory_mb: 320
+max_queued_jobs: 2
+cv_folds: 3
+tuning_iterations: 3
+shap_rows: 3
+seed: 42
+ephemeral_storage: true

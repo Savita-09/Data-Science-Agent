@@ -71,7 +71,7 @@ def create_app(settings=None):
         return response
 
     @app.get('/api/health')
-    def health():return {'status':'ok','version':'1.0.0','llm_configured':settings.llm_configured,'groq_configured':settings.groq_configured,'groq_model':settings.groq_model,'auth_required':bool(settings.api_key),'max_rows':settings.max_rows,'max_upload_mb':settings.max_upload_mb,'max_job_seconds':settings.max_job_seconds}
+    def health():return {'status':'ok','version':'1.0.0','llm_configured':settings.llm_configured,'groq_configured':settings.groq_configured,'groq_model':settings.groq_model,'auth_required':bool(settings.api_key),'ephemeral_storage':settings.ephemeral_storage,'max_rows':settings.max_rows,'max_upload_mb':settings.max_upload_mb,'max_job_seconds':settings.max_job_seconds}
 
     def persist_dataset(frame,filename):
         dataset_id=str(uuid4());content=frame.to_csv(index=False).encode('utf-8');sha=hashlib.sha256(content).hexdigest()

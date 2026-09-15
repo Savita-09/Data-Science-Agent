@@ -52,3 +52,35 @@ jobs:
       - run: npm run build
       - name: Frontend regression tests
         run: node --experimental-strip-types --test tests/*.test.ts
+
+  cloud-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build backend container
+        run: docker build -f Dockerfile.backend -t autods-backend:test .
+      - name: Run synthetic workflow within 512 MB
+        shell: bash
+        run: |
+          export APP_API_KEY="ci-disposable-application-test-key-with-no-real-access"
+          python -m pip install httpx
+          docker run -d --name autods-test --memory=512m --memory-swap=512m \
+            -p 127.0.0.1:8001:10000 \
+            -e APP_ENV=production -e APP_API_KEY \
+            -e APP_CONFIG=/srv/autods/config.render.yaml \
+            -e CORS_ORIGINS=https://data-science-agent-rosy.vercel.app \
+            autods-backend:test
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8001/api/health > /dev/null; then break; fi
+            sleep 2
+          done
+          python scripts/smoke_e2e.py --url http://127.0.0.1:8001
+      - name: Container diagnostics
+        if: always()
+        run: docker logs autods-test; docker inspect autods-test --format '{{json .State}}'

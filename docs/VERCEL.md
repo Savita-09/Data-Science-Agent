@@ -35,3 +35,15 @@ LLM_API_KEY=
 Run `python scripts/run-local.py --port 8001 --env-file .env.hosted`. This explicitly chosen environment file disables implicit loading of the normal development `.env`. Keep the API bound to loopback, verify authentication, then connect an HTTPS tunnel to port 8001 and use its URL in the dashboard. The isolated directories start without your existing local datasets or analyses. Stop the tunnel to remove public access; stopping the launcher stops both Python services.
 
 For an always-on deployment, use a persistent Python host and a stable HTTPS address. Free frontend hosting does not provide persistent ML compute or storage for this architecture.
+
+## Free Render cloud demo
+
+`render.yaml` defines a **Free** Docker web service using `Dockerfile.backend`. The container launches the API and worker together on port 10000, and generates a private application key during Blueprint creation. Import the repository as a Render Blueprint after reviewing the Free plan. The API health endpoint is `/api/health`.
+
+`config.render.yaml` limits the demo to 5 MB uploads, 5,000 rows, 40 columns, 20 selected features, two queued/running jobs, and a 320 MB training-process budget within the host's memory limit. Start with the synthetic churn sample and Quick mode. Large ML/DL tasks may fail with a resource-limit error. This is a demo configuration, not a production capacity guarantee.
+
+Render's free filesystem is temporary. Uploads, SQLite records, models, and reports are lost when the instance sleeps, restarts, or redeploys. The frontend displays this limitation when connected to this configuration. Download outputs you need to retain. The free database plan also has an expiry, so it is not used as a substitute for durable storage. See [Render free service limits](https://render.com/docs/free).
+
+Keep the service on the Free plan and review account usage limits. No paid disk, database, or worker service is configured by this Blueprint. Set a zero spending limit where available; Render may charge usage overages when a payment method is present. This setup does not add a payment method.
+
+After Render reports the backend healthy, set `VITE_API_BASE_URL` in Vercel to its HTTPS service URL and redeploy. `CORS_ORIGINS` in the Blueprint is the current dashboard origin. Enter the generated `APP_API_KEY` in the dashboard's API connection dialog. Add `GROQ_API_KEY` privately in Render's environment settings if you want Groq chat; the Blueprint does not contain a provider credential.

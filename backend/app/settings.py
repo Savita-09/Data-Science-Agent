@@ -10,6 +10,7 @@ load_dotenv(ROOT / '.env')
 class Settings(BaseModel):
     app_env: str = 'development'
     api_key: str = ''
+    ephemeral_storage: bool = False
     data_root: Path = ROOT / 'data'
     project_root: Path = ROOT / 'projects'
     max_upload_mb: int = Field(20, ge=1, le=100)
