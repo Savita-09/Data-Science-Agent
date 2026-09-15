@@ -1,7 +1,8 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Activity,ArrowDownToLine,ArrowRight,BarChart3,BrainCircuit,Check,ChevronRight,Circle,Database,FileText,FlaskConical,KeyRound,LayoutDashboard,LoaderCircle,MessageSquareText,Play,Plus,RefreshCw,Send,ShieldCheck,Sparkles,Square,Upload,Workflow,X} from 'lucide-react';
-import {api,apiUrl,configuredApiBase,downloadArtifact} from './api';
+import {api,apiUrl,configuredApiBase,downloadArtifact,BACKEND_UNAVAILABLE} from './api';
+import {ApiError,BackendUnavailableError,requestJson,waitForBackend} from './transport';
 import {normalizeApiBase} from './api-config';
 import {EDAWorkspace} from './EDADashboard';
 import MainReport from './MainReport';
@@ -16,6 +17,8 @@ const number=(value:unknown)=>typeof value==='number'?value.toLocaleString(undef
 export default function App(){
   const [view,setView]=useState('dashboard'),[key,setKey]=useState(''),[keyDraft,setKeyDraft]=useState(''),[connect,setConnect]=useState(false),[ready,setReady]=useState(false);
   const [serverDraft,setServerDraft]=useState(''),[connectionError,setConnectionError]=useState('');
+  const [connectionState,setConnectionState]=useState<'connecting'|'waking'|'connected'|'offline'>('connecting'),[backendError,setBackendError]=useState(''),[connectionAttempt,setConnectionAttempt]=useState(0);
+  const [workspaceReady,setWorkspaceReady]=useState(false);
   const [health,setHealth]=useState<Health|null>(null),[jobs,setJobs]=useState<Job[]>([]),[activeId,setActiveId]=useState(''),[job,setJob]=useState<Job|null>(null),[events,setEvents]=useState<ProgressEvent[]>([]),[dataset,setDataset]=useState<Dataset|null>(null);
   const [goal,setGoal]=useState(''),[task,setTask]=useState('auto'),[target,setTarget]=useState(''),[includeDL,setIncludeDL]=useState(true),[useLLM,setUseLLM]=useState(false),[budget,setBudget]=useState(600),[quick,setQuick]=useState(false);
   const [validation,setValidation]=useState<ProblemValidation|null>(null),[validationError,setValidationError]=useState('');
@@ -25,21 +28,49 @@ export default function App(){
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[view]);
   useEffect(()=>{setKey(sessionStorage.getItem('autods-server-key')||'');setKeyDraft(sessionStorage.getItem('autods-server-key')||'');setServerDraft(configuredApiBase());setActiveId(sessionStorage.getItem('autods-server-analysis')||'');setReady(true);},[]);
   const refreshJobs=useCallback(async()=>{const rows=await api<Job[]>('/analyses',key);setJobs(rows);return rows;},[key]);
-  useEffect(()=>{if(!ready)return;void api<Health>('/health',key).then(async h=>{setHealth(h);setBudget(b=>Math.min(b,h.max_job_seconds));if(h.auth_required&&!key){setConnect(true);return;}const rows=await refreshJobs();setActiveId(current=>rows.some(r=>r.id===current)?current:rows[0]?.id||'');}).catch(e=>setError(e.message));},[ready,key,refreshJobs]);
-  useEffect(()=>{if(!activeId||!ready)return;sessionStorage.setItem('autods-server-analysis',activeId);setEvents([]);setLocalRow(0);setPrediction('');let stopped=false;const controller=new AbortController();let polling:ReturnType<typeof setInterval>;
+  useEffect(()=>{
+    if(!ready)return;
+    const controller=new AbortController();
+    setConnectionState('connecting');setBackendError('');setHealth(null);setWorkspaceReady(false);
+    void (async()=>{
+      try{
+        const h=await waitForBackend<Health>(apiUrl('/health'),{signal:controller.signal,onRetry:()=>setConnectionState('waking')});
+        if(controller.signal.aborted)return;
+        setHealth(h);setBudget(b=>Math.min(b,h.max_job_seconds));
+        if(h.auth_required&&!key){setConnect(true);setConnectionState('connected');return;}
+        const rows=await requestJson<Job[]>(apiUrl('/analyses'),{signal:controller.signal,headers:key?{'X-API-Key':key}:{}});
+        if(controller.signal.aborted)return;
+        setJobs(rows);setActiveId(current=>rows.some(r=>r.id===current)?current:rows[0]?.id||'');
+        if(!rows.length){setJob(null);setEvents([]);sessionStorage.removeItem('autods-server-analysis');}
+        setConnectionState('connected');setBackendError('');setWorkspaceReady(true);
+      }catch(e){
+        if(controller.signal.aborted)return;
+        if(e instanceof ApiError&&e.status===401){setConnectionError('The server is online. Enter its APP_API_KEY to access your workspace.');setConnect(true);setConnectionState('connected');}
+        else{setHealth(null);setConnectionState('offline');setBackendError(e instanceof BackendUnavailableError?'The server has not responded yet. Retry the connection, or check the backend URL in connection settings.':(e as Error).message);}
+      }
+    })();
+    return()=>controller.abort();
+  },[ready,key,connectionAttempt]);
+  useEffect(()=>{
+    const reconnect=()=>{if(connectionState==='connected')setConnectionAttempt(n=>n+1);};
+    window.addEventListener(BACKEND_UNAVAILABLE,reconnect);
+    window.addEventListener('online',reconnect);
+    return()=>{window.removeEventListener(BACKEND_UNAVAILABLE,reconnect);window.removeEventListener('online',reconnect);};
+  },[connectionState]);
+  useEffect(()=>{if(!activeId||!ready||!workspaceReady||connectionState!=='connected')return;sessionStorage.setItem('autods-server-analysis',activeId);setEvents([]);setLocalRow(0);setPrediction('');let stopped=false;const controller=new AbortController();let polling:ReturnType<typeof setInterval>;
     const load=async()=>{const value=await api<Job>(`/analyses/${activeId}`,key);if(stopped)return;setJob(value);if(value.result)setPredictionInput(JSON.stringify([Object.fromEntries(value.result.model_schema.map(c=>[c.name,c.example]))],null,2));if(!ACTIVE.includes(value.status))clearInterval(polling);};
     void load().then(()=>refreshJobs()).catch(e=>setError(e.message));polling=setInterval(()=>{void load().catch(()=>{});},2500);
     void api<{question:string;answer:string;source:string}[]>(`/analyses/${activeId}/chat`,key).then(setChat).catch(()=>{});
     (async()=>{try{const response=await fetch(apiUrl(`/analyses/${activeId}/events`),{headers:key?{'X-API-Key':key}:{},signal:controller.signal});if(!response.ok)return;const reader=response.body?.getReader();if(!reader)return;const decoder=new TextDecoder();let buffer='';while(!stopped){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const data=part.split('\n').find(line=>line.startsWith('data: '));if(!data)continue;const value=JSON.parse(data.slice(6));if(part.includes('event: progress'))setEvents(e=>[...e.filter(item=>item.id!==value.id),value].slice(-50));if(part.includes('event: done')){await load();await refreshJobs();}}}}catch{/* Polling keeps progress available if SSE disconnects. */}})();
     return()=>{stopped=true;controller.abort();clearInterval(polling);};
-  },[activeId,key,ready,refreshJobs]);
+  },[activeId,key,ready,refreshJobs,connectionState,workspaceReady]);
   useEffect(()=>{if(!notice)return;const timeout=setTimeout(()=>setNotice(''),6000);return()=>clearTimeout(timeout);},[notice]);
   useEffect(()=>{setValidation(null);setValidationError('');if(!dataset)return;let stale=false;
     const timer=setTimeout(()=>{void api<ProblemValidation>(`/datasets/${dataset.id}/validate`,key,{method:'POST',body:JSON.stringify({goal:analysisGoal(goal,target,task),task,target:target||null,cv_folds:3,seed:42})}).then(value=>{if(!stale)setValidation(value);}).catch(e=>{if(!stale)setValidationError(e.message);});},250);
     return()=>{stale=true;clearTimeout(timer);};
   },[dataset,goal,task,target,key]);
 
-  async function execute(action:()=>Promise<void>){setBusy(true);setError('');try{await action();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  async function execute(action:()=>Promise<void>){setBusy(true);setError('');try{await action();}catch(e){setError(e instanceof BackendUnavailableError?'Connection interrupted. Wait for the server to reconnect, then try your action again.':(e as Error).message);}finally{setBusy(false);}}
   async function upload(file?:File){if(!file)return;await execute(async()=>{const form=new FormData();form.append('file',file);const data=await api<Dataset>('/datasets',key,{method:'POST',body:form});const setup=uploadedDatasetSetup(goal,!!dataset);setDataset(data);setTarget(setup.target);setTask(setup.task);setGoal(setup.goal);setNotice('Dataset saved. Select the outcome you want to predict.');});}
   async function sample(){await execute(async()=>{const data=await api<Dataset>('/datasets/sample',key,{method:'POST'});setDataset(data);setTarget('churn');setGoal('');setTask('auto');});}
   async function editSetup(){if(!job)return;await execute(async()=>{const data=await api<Dataset>(`/datasets/${job.dataset_id}`,key);const setup=restoredDatasetSetup(data,{...job.request,target:job.result?.plan.target||job.request.target});setDataset(data);setTask(setup.task);setTarget(setup.target);setGoal(setup.goal);setIncludeDL(job.request.include_dl);setUseLLM(job.request.use_llm);setBudget(job.request.time_budget_seconds);setQuick(job.request.quick);setError('');setView('new');setNotice('Dataset restored. Choose a target and review the problem type before running.');});}
@@ -62,11 +93,14 @@ export default function App(){
   const completed=new Set(job?.checkpoints.map(c=>c.stage)||[]),running=!!job&&ACTIVE.includes(job.status);
   const currentNav=NAV.find(n=>n.id===view)!;
   const effectiveGoal=analysisGoal(goal,target||validation?.target||'',task);
-  const blockedReason=runBlocker({busy,connected:!!health,hasDataset:!!dataset,goal:effectiveGoal,validation,validationError});
+  const backendReady=connectionState==='connected'&&workspaceReady;
+  const blockedReason=runBlocker({busy,connected:backendReady,hasDataset:!!dataset,goal:effectiveGoal,validation,validationError});
 
-  return <div className="autods-app"><header className="app-header"><button className="app-brand" onClick={()=>setView('dashboard')}><Workflow size={24}/><span>AutoDS <b>Studio</b></span></button><span className="header-caption">Autonomous AI Data Scientist</span><span className={`connection ${health?'connected':''}`}>{health?'Python engine connected':'Backend offline'}</span><button className="icon-button" aria-label="Configure API connection" onClick={()=>{setKeyDraft(key);setConnect(true);}}><KeyRound size={18}/></button></header>
+  return <div className="autods-app"><header className="app-header"><button className="app-brand" onClick={()=>setView('dashboard')}><Workflow size={24}/><span>AutoDS <b>Studio</b></span></button><span className="header-caption">Autonomous AI Data Scientist</span><span className={`connection ${health?'connected':''}`}>{connectionState==='connecting'?'Connecting to Python…':connectionState==='waking'?'Starting Python server…':health?'Python engine connected':'Backend offline'}</span><button className="icon-button" aria-label="Configure API connection" onClick={()=>{setKeyDraft(key);setServerDraft(configuredApiBase());setConnect(true);}}><KeyRound size={18}/></button></header>
     <aside className="app-sidebar"><nav aria-label="Workspace navigation">{NAV.map(item=><button aria-label={item.name} aria-current={view===item.id?'page':undefined} title={item.name} key={item.id} onClick={()=>setView(item.id)} className={view===item.id?'selected':''}><item.icon size={18}/><span>{item.name}</span></button>)}</nav><div className="sidebar-note"><ShieldCheck size={22}/><strong>{health?.ephemeral_storage?'Temporary demo workspace':'Your saved workspace'}</strong><p>{health?.ephemeral_storage?'Download results before the free server goes idle.':'Datasets, models, and reports persist on your server.'}</p><small>{useLLM?'LLM reasoning enabled':'Python computes every metric'}</small></div><a className="api-link" href={`${(configuredApiBase()||'').replace(/\/+$/,'').replace(/\/api$/,'')}/docs`} target="_blank" rel="noreferrer">API documentation <ArrowRight size={15}/></a></aside>
     <main className="app-main"><div className="page-heading"><div><span className="eyebrow">DATA → EVIDENCE → DECISIONS</span><h1>{view==='new'?'What would you like to solve?':view==='dashboard'?'Your data science workspace.':currentNav.name}</h1><p>{view==='new'?'Add your data and business problem. Review the plan, then let the workflow run.':view==='dashboard'?'Follow every step, inspect the evidence, and use the result.':view==='eda'?'Explore distributions, data quality, and relationships in any uploaded dataset.':'Measured results from your selected analysis.'}</p></div><button className="primary" onClick={()=>setView('new')}><Plus size={17}/>New analysis</button></div>
+    {(connectionState==='connecting'||connectionState==='waking')&&<div className="message" role="status"><LoaderCircle className="spin" size={20}/><span><strong>{connectionState==='waking'?'Waiting for the Python server to wake up':'Connecting to the Python server'}</strong><br/>Free cloud hosting can take about a minute to start. This page reconnects automatically.</span></div>}
+    {backendError&&<div className="message error" role="alert"><span>{backendError}</span><button className="secondary" onClick={()=>setConnectionAttempt(n=>n+1)}>Retry connection</button></div>}
     {health?.ephemeral_storage&&<div className="message" role="status"><span><strong>Free cloud demo</strong><br/>Uploads, analyses, and models are deleted when the server sleeps or restarts. Download reports and trained models you want to keep. Large training jobs may exceed the free server’s limits.</span></div>}
     {error&&<div className="message error" role="alert"><span>{error}</span><button aria-label="Dismiss error" className="icon-button" onClick={()=>setError('')}><X size={16}/></button></div>}
     {view!=='dashboard'&&view!=='profile'&&view!=='new'&&view!=='eda'&&jobs.length>0&&<div className="analysis-picker"><label>Analysis<select aria-label="Selected analysis" value={activeId} onChange={e=>{setActiveId(e.target.value);setJob(null);}}>{jobs.map(item=><option key={item.id} value={item.id}>{item.dataset_filename||'Dataset'} · {analysisTitle(item)} · {item.status} · {new Date(item.created*1000).toLocaleTimeString()}</option>)}</select></label>{job&&<span className={`status ${job.status}`}>{job.status.replaceAll('_',' ')}</span>}</div>}

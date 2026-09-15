@@ -47,3 +47,11 @@ Render's free filesystem is temporary. Uploads, SQLite records, models, and repo
 Keep the service on the Free plan and review account usage limits. No paid disk, database, or worker service is configured by this Blueprint. Set a zero spending limit where available; Render may charge usage overages when a payment method is present. This setup does not add a payment method.
 
 After Render reports the backend healthy, set `VITE_API_BASE_URL` in Vercel to its HTTPS service URL and redeploy. `CORS_ORIGINS` in the Blueprint is the current dashboard origin. Enter the generated `APP_API_KEY` in the dashboard's API connection dialog. Add `GROQ_API_KEY` privately in Render's environment settings if you want Groq chat; the Blueprint does not contain a provider credential.
+
+### Connection recovery
+
+The dashboard retries the public health endpoint for up to 100 seconds while the free instance wakes up. It shows a connecting/starting message, then loads the workspace automatically. Health probes omit the application key so startup does not depend on a CORS preflight. Network failures during later API calls start another connection check; uploads, training requests, and chat are never automatically resubmitted. If the server is still unavailable, use **Retry connection** or review **API connection**. A 401 means the server is reachable but needs the correct application key.
+
+Use the production dashboard at `https://data-science-agent-rosy.vercel.app`. A Vercel preview has a different origin and needs its own explicit backend CORS entry and API URL configuration. Do not use a wildcard CORS policy or publish the application key to solve connection errors.
+
+The deployed Render service ignores `frontend/**` and `docs/**` in its Build Filters. Dashboard-only updates therefore deploy on Vercel without restarting the Python service and discarding its temporary workspace.
