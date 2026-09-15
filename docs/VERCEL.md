@@ -40,7 +40,7 @@ For an always-on deployment, use a persistent Python host and a stable HTTPS add
 
 `render.yaml` defines a **Free** Docker web service using `Dockerfile.backend`. The container launches the API and worker together on port 10000, and generates a private application key during Blueprint creation. Import the repository as a Render Blueprint after reviewing the Free plan. The API health endpoint is `/api/health`.
 
-`config.render.yaml` limits the demo to 5 MB uploads, 5,000 rows, 40 columns, 20 selected features, two queued/running jobs, and a 320 MB training-process budget within the host's memory limit. Start with the synthetic churn sample and Quick mode. Large ML/DL tasks may fail with a resource-limit error. This is a demo configuration, not a production capacity guarantee.
+`config.render.yaml` limits the demo to 5 MB uploads, 5,000 rows, 40 columns, 20 selected features, two queued/running jobs, and a 384 MB training-process budget within the host's memory limit. Start with the synthetic churn sample and Quick mode. Large ML/DL tasks may fail with a resource-limit error. This is a demo configuration, not a production capacity guarantee.
 
 Render's free filesystem is temporary. Uploads, SQLite records, models, and reports are lost when the instance sleeps, restarts, or redeploys. The frontend displays this limitation when connected to this configuration. Download outputs you need to retain. The free database plan also has an expiry, so it is not used as a substitute for durable storage. See [Render free service limits](https://render.com/docs/free).
 
